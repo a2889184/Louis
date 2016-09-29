@@ -1,0 +1,146 @@
+Ver 3.4
+	DeltaFF use sample point ff and it's groudFF. This allow difference in
+	vertex. The sample algorithm  also change.
+	
+Ver 3.3.2
+	Speed up (child triangle area, edge length, ff), strictly check neighbor
+	triangle at initialization(check "continueous" patch)
+	
+	Change:
+	* Rename PartitionTri() to PartitionSource();
+	* Rename FullPartition() to PartitionDestination();
+	* Modify PartitionSource() and PartitionDestitnation() to
+	  split by edge, not middle point.
+	
+Ver 3.3.1
+	Check destined triangle's vertices radiosity if they are all too
+	shine! If they are, then don't shade, which will reduce frequency
+	of split triangle and speedup!!!.
+
+	Change:
+	* Modify for loop in DoRadiosity in rad.c.
+
+Note:
+	It needs least iterations to converge(by test model1.tri) than
+	ver 3.2.1(double recursive version). Maybe less	accurate if double
+	recursive version shade correctly, but it seems double recursive 
+	version is hardly correct!!!
+
+Ver 3.3
+	Shade() is nonrecusive, in other words, usually only partition once,
+	no furthur partition. 
+
+	Change:
+	* Modify Shade().
+	* Add CalRadiosity().
+		
+Ver 3.2.1
+	sample source triangle with dynamic partition of longest edge.
+	
+	Change:
+	* Modify AdaptCalFF(), CalFF(), PartitionTri().
+
+Note:
+	Now, all light source is double face, because in CalFF if ff < 0
+     	then ff = -ff; and in rayhit, no check for which side hitted.
+	so in box.v32.1 the roof has light (the light is lit downward).
+	
+
+
+Ver 3.2
+	* When needs to split triangle, split the longest edge.
+	* not only calculate three vertex of tri, but calculate "random" sample
+	  points in triangle to Find Delta FF difference.
+	* use (tri->area / SampleArea) to determine number of sample point.
+	* fix "split neighbor bugs" and shading bugs in version 3.1.
+	* command line option to set parameters to run "radioisty".
+
+	Change:
+	* Modify CalFF(), AdpatCalFF() to calculate random sample point.
+	* Modify Shade() to fix shading bugs.
+	* Modify InitRad() to fix "neighbor bugs".
+	* Add GetPointInTriangle() to get a random sample point in triangle.
+	* Add ProcessOption() to process option.
+	
+
+Ver 3.1
+	Implement partner partition. Let Interplation smooth.
+
+	Change:
+	* put functions, variables, constant related to Shade() into shade.c
+	* add neighbor[3], deltaaccB[3] to Triangle definition.
+	* add CalArea, CalCenter macro functions to vector.h
+	* modify Shade(), FullPartition();
+	* add SetNeighborToMe() function for mantain neighbor feature.
+
+
+--------------------------------------------------------------------------------------
+Special Note:
+	* triangle partition strategy.
+	** source triangle sampling:
+	   Currently always partition by edge p[1]-p[2]. But in the paper [COHEN 89]
+said that the ff is more accurate if the source is near disk. so the
+partition strategy can be changed to partition the longest edge.
+	** destination triangle partition:
+	   Current strategy is 1) if DeltaFF is big. 2) if the area is big
+enough. There is still another problem. Then strategy will produce oblong
+triangle, if the triangle's DeltaFF is small and the area is large, there
+are posssibly contain radiosity peak.
+
+	* Delay shading:
+	  When divide triangle, the child triangles are not shade
+immediately. This can greatly reduce the recursive depth, however, this
+strategy won't save process time. But when use partner triangle strategy,
+this one can reduce process time significently.
+
+-------------------------------------------------------------------------------
+Ver 3.0
+	* dynamtic partition triangle to fit the assumption of radiosity
+	   
+		--- The gradient of triangle is small enough. ---
+
+	Change:
+	* Modify Triangle structure in rad.h -- add parent member.
+	* Doradiosity() Change -- use Shade() to radiate a destined triangle.
+	* Add Shade() to do destined triangle to source triangle radiosity.
+	* Add FullPartition() to substructure triangle.
+	* Add FindMiddleIndex() for FullPartition() to call.
+
+
+Ver 2.2
+	* Fix bugs in raycast.c (Important)
+	
+	Change:
+	* In TriHitted(), the FALSE condition should be (t < 0) , not (a < 0)
+	  a1 < 0 means two patch's normal is opposite.
+	  a2 < 0 means see front face.
+
+Ver 2.1 
+	* Use adaptive nonuniform sampling point for source.
+
+	Change:
+	* Add CalFFv2() and CalFF() for recursive form factor calculation.
+	* Add PartitionTri() to automatic split source.
+
+	*** CalFFv2 can be changed so the speed can double.	 
+
+Ver 2.0
+	* Use vertex to patch form factor. 
+	* Use ray casting for patch hit.
+	* Shot ray from vertex to radiosity source.
+	
+	Change:
+	* Triangle class data.
+	* DoRadiosity function have been rewriten.
+
+Ver 1.0 
+	* Use Ray casting and hemisphere.
+	
+	Change:
+	* Change output format to fit another system radiosity to use p2t, intc.
+	  so we don't need to write them.
+	* Add time information by uncle.
+
+Version orig
+  Copy from Ming. no change.
+  
