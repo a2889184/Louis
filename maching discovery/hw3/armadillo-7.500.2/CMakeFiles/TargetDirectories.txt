@@ -1,7 +1,0 @@
-/home/louis/louis/maching discovery/hw3/armadillo-7.500.2/CMakeFiles/install.dir
-/home/louis/louis/maching discovery/hw3/armadillo-7.500.2/CMakeFiles/list_install_components.dir
-/home/louis/louis/maching discovery/hw3/armadillo-7.500.2/CMakeFiles/rebuild_cache.dir
-/home/louis/louis/maching discovery/hw3/armadillo-7.500.2/CMakeFiles/armadillo.dir
-/home/louis/louis/maching discovery/hw3/armadillo-7.500.2/CMakeFiles/install/strip.dir
-/home/louis/louis/maching discovery/hw3/armadillo-7.500.2/CMakeFiles/install/local.dir
-/home/louis/louis/maching discovery/hw3/armadillo-7.500.2/CMakeFiles/edit_cache.dir
