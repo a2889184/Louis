@@ -1,0 +1,291 @@
+.data
+str1: .asciiz "\nInput string 1(max 100 words): \n"
+str2: .asciiz "Input string 2(max 100 words): \n"
+str3: .asciiz "Alignment score: \n"
+str4: .asciiz " "
+str5: .asciiz "\n"
+input1: .space 101
+input2: .space 101
+array: .space 44100
+
+.text
+main: 
+	li $v0, 4
+	la $a0, str1
+	syscall
+
+	#read the string1, and save at $s0
+	la $a0, input1
+	li $a1, 101
+	li $v0, 8
+	move $s0, $a0
+	syscall
+
+	li $v0, 4
+	la $a0, str2
+	syscall
+
+	#read the string2, and save at $s1
+	la $a0, input2
+	li $a1, 101
+	li $v0, 8
+	move $s1, $a0
+	syscall
+
+	#find strlen of string1 and string2, save them in $s2 and $s3 seperately.
+	move $a0, $s0
+	jal strlen     #use function strlen to get length of a string
+	move $s2, $v0
+	move $a0, $s1  
+	jal strlen
+	move $s3, $v0
+
+	#jump to SW function to get the alignment score
+	la $s7, array   #load an enough array(use 1D to implement 2D array) 
+	move $a0, $s0
+	move $a1, $s1
+	move $a2, $s2
+	move $a3, $s3
+
+	la $a0, str3
+	li $v0, 4
+	syscall
+
+	jal SW    #call the SW function to calculate alignment score
+	move $a0, $v0
+	li $v0, 1
+	syscall
+
+	la $a0, str5
+	li $v0, 4
+	syscall
+
+	li $v0, 10
+	syscall
+
+strlen:
+	addi $sp, $sp, -12
+	sw $s0, 8($sp)
+	sw $s1, 4($sp)
+	sw $ra, 0($sp)
+
+	li $t0, -1 #the strlen
+	move $s0, $a0
+
+L1:	 
+	lb $s1, 0($s0)     #load string[i]
+	beqz $s1, Exit1    #if string[i] == '\0', exit
+	addi $t0, $t0, 1
+	addi $s0, $s0, 1
+	j L1
+
+Exit1:
+	lw $ra, 0($sp)
+	lw $s1, 4($sp)
+	lw $s0, 8($sp)
+	addi $sp, $sp, 12
+	move $v0, $t0
+	jr $ra
+
+
+SW:
+	addi $sp, $sp, -16
+	sw $s4, 12($sp)
+	sw $s5, 8($sp)
+	sw $s6, 4($sp)
+	sw $ra, 0($sp)
+
+	li $t0, 0   #use as index
+	li $t5, 11025  #max size of array
+
+init:
+	slt $t4, $t0, $t5 #if t0 < 11025, then keep init, or exit.
+	beqz $t4, DP
+	sll $t3, $t0, 2
+	add $t2, $s7, $t3   #compute address of array[4 * $t0]
+	sw $zero, 0($t2)  #save 0 in (array + 4 * $t0).
+	addi $t0, $t0, 1
+	j init
+
+DP:
+	addi $s4, $s3, 1   #save (string2's size + 1) in $s4.
+
+	li $t0, 0  #index of row
+RowLoop:
+
+	bge $t0, $s2, Exit3
+	addi $t1, $t0, 1
+	li $t2, 0  #index of column
+
+ColumnLoop:
+
+	bge $t2, $s3, Exit2
+
+	addi $t3, $t2, 1
+
+	mult $t0, $s4    #calculate the address of left_up element, row * (strlen2 + 1) + column
+	mflo $t4   
+	add $t4, $t4, $t2  #save offset of left_up in $t4
+	sll $t4, $t4, 2
+	add $t4, $s7, $t4
+	lw $t4, 0($t4)
+
+
+	add $t8, $s0, $t0  #save string1[i]' address
+	lb $t8, 0($t8)
+	add $t9, $s1, $t2  #save string2[i]' address
+	lb $t9, 0($t9)
+
+	beq $t8, $t9, Match
+	addi $t4, $t4, -1
+	j MisMatch
+Match:
+	addi $t4, $t4, 3
+	
+MisMatch:
+	mult $t1, $s4   #calculate the address of left element, (row + 1) * (strlen2 + 1) + column
+	mflo $t5   
+	add $t5, $t5, $t2  #save offset of left in $t5
+	sll $t5, $t5, 2
+	add $t5, $s7, $t5
+	lw $t5, 0($t5)
+	addi $t5, $t5, -2  #gap
+
+
+	mult $t0, $s4  #calculate the address of up element, row * (strlen2 + 1) + (column + 1)
+	mflo $t6   
+	add $t6, $t6, $t3  #save offset of up in $t6
+	sll $t6, $t6, 2
+	add $t6, $s7, $t6
+	lw $t6, 0($t6)
+	addi $t6, $t6, -2   #gap
+
+	mult $t1, $s4    #calculate the address of now element, (row + 1) * (strlen2 + 1) + (column + 1)
+	mflo $t7   
+	add $t7, $t7, $t3 
+	sll $t7, $t7, 2
+	add $t7, $s7, $t7   #save the addr of array[row][column] in $t7
+
+
+	#if row = 0
+	beqz $t0, RowEqZero
+	beqz $t2, RowNeZeroColumnEqZero
+
+	#RowNeZeroColumnNeZero
+	bge $t4, $t6, UpLeftbigThanUp
+	bge $t6, $t5, UpMax
+
+	#left max
+	sw $t5, 0($t7)
+	j OUT
+
+UpMax:
+	sw $t6, 0($t7)
+	j OUT
+
+
+UpLeftbigThanUp:
+	bge $t4, $t5, UpLeftMax
+	#left max
+	sw $t5, 0($t7)
+	j OUT
+
+UpLeftMax:
+	sw $t4, 0($t7)
+	j OUT
+
+
+RowNeZeroColumnEqZero:
+	sw $t6, 0($t7)
+	j OUT
+
+RowEqZero:
+	beqz $t2, RowEqZeroColumnEqZero
+
+	#RowEqZeroColumnNeZero
+	sw $t5, 0($t7)
+	j OUT
+
+RowEqZeroColumnEqZero:
+	sw $t4, 0($t7)
+
+OUT:
+	#check array[row][column] is greater than 0
+	lw $t8, 0($t7)
+
+	bge $t8, $0, OUT2
+	sw $0, 0($t7)
+OUT2:
+
+	addi $t2, $t2, 1
+	j ColumnLoop
+
+
+Exit2:
+	addi $t0, $t0, 1
+	j RowLoop
+
+Exit3:
+	#calculate the address of last element, (strlen1) * (strlen2 + 1) + strlen2 = strlen1 * strlen2 + strlen1 + strlen2
+	mult $s2, $s3  
+	mflo $t0
+	add $t0, $t0, $s2
+	add $t0, $t0, $s3
+	sll $t0, $t0, 2
+	add $t0, $s7, $t0  #addr of array[strlen1][strlen2]
+	lw $v0, 0($t0)
+
+	lw $ra, 0($sp)
+	lw $s6, 4($sp)
+	lw $s5, 8($sp)
+	lw $s4, 12($sp)
+
+	addi $sp, $sp, 16
+
+	jr $ra
+	
+	
+	
+Print: #can be use to debug
+
+	addi $t4, $s3, 1   #save (string2's size + 1) in $t4.
+
+	li $t0, 0  #index of row
+A:
+
+	bge $t0, $s2, Exit5
+	addi $t1, $t0, 1
+	li $t2, 0  #index of column
+
+B:
+	bge $t2, $s3, Exit4
+	addi $t3, $t2, 1
+
+	mult $t1, $t4   #calculate the address of now element, (row + 1) * (strlen2 + 1) + (column + 1)
+	mflo $t7   
+	add $t7, $t7, $t3 
+	sll $t7, $t7, 2
+	add $t7, $s7, $t7
+
+	lw $a0, 0($t7)
+	li $v0, 1
+	syscall
+
+	la $a0, str4
+	li $v0, 4
+	syscall
+
+	addi $t2, $t2, 1
+	j B
+Exit4:
+	la $a0, str5
+	li $v0, 4
+	syscall
+	addi $t0, $t0, 1
+	j A
+Exit5:
+	jr $ra
+
+
+
+

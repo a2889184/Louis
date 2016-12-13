@@ -1,0 +1,52 @@
+.data
+str1: .asciiz "\nInput an integer: \n"
+str2: .asciiz "Result: \n"
+
+.text
+main: 
+	li $v0, 4
+	la $a0, str1
+	syscall
+
+	li $v0, 5
+	syscall
+
+	move $a0, $v0
+	jal fib
+	move $t0, $v0
+
+	li $v0, 4
+	la $a0, str2
+	syscall
+
+	move $a0 $t0
+	li $v0, 1
+	syscall
+
+	li $v0, 10
+	syscall
+
+fib:
+	bgt $a0, 1, recursive
+	move $v0, $a0
+	jr $ra
+
+recursive:
+	sub $sp, $sp, 12
+	sw $ra, 0($sp)
+	sw $a0, 4($sp)
+
+	addi $a0, $a0, -1
+	jal fib
+	sw $v0 8($sp)
+
+	lw $a0 4($sp)
+	addi $a0, $a0, -2
+	jal fib
+
+	lw $v1, 8($sp)
+	add $v0, $v0, $v1
+
+	lw $ra, 0($sp)
+	addi $sp, $sp, 12
+	jr $ra

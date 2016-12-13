@@ -1,0 +1,16 @@
+c++
+
+and some library
+fstream
+iostream
+stdio.h
+math.h
+string
+vector
+map
+utility
+unordered_map
+algorithm
+set
+cstdlib
+ctime
