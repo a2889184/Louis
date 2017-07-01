@@ -4,20 +4,13 @@ import tensorflow as tf
 import math
 import random
 import itertools
-import matplotlib.pyplot as plt
 
 pickle_file = 'data.pickle'
-image_size = 32
+image_size = 28
 num_labels = 10 # 0~10 is first digit(10 means not a number), 11~21 is second digit(21 means not a number)...... and so on
 num_channels = 1 # grayscale
-digit_length = 4
+digit_length = 6
 group_num = 10
-
-myAlpha, myLambda = (1.9769021954241999, 1.073851239616047)
-def selu(x):
-    alpha = myAlpha
-    scale = myLambda
-    return scale*tf.where(x>=0.0, x, alpha*tf.nn.elu(x))
 
 def switch_num_to_pos(label):
 	pos_list = list()
@@ -99,7 +92,6 @@ def accuracy(predictions, labels):
 	return 100.0 * (correct / float(labels.shape[0]))
 
 
-print ('execute ' + pickle_file)
 
 with open(pickle_file, 'rb') as f:
 	save = pickle.load(f)
@@ -127,26 +119,25 @@ print (train_labels_num[:5])
 print ('reshape done !')
 
 
-batch_size = 16
+batch_size = 64
 patch_size_1 = 5
 patch_size_2 = 3
 patch_size_3 = 1
-depth_1 = 16
-depth_2 = 15
-depth_3 = 32
-depth_4 = 64
-depth_5 = 64
-num_hidden_1 = 1024
-num_hidden_2 = 512
+depth_1 = 6
+depth_2 = 3
+depth_3 = 1
+depth_4 = 20
+num_hidden_1 = 64
+num_hidden_2 = 32
 num_hidden_3 = 32
 
 graph = tf.Graph()
 
-std1 = 0.1
-std2 = 0.1
+std1 = 1
+std2 = 1
 
-cont = 0.0
-cont2 = 0.0
+cont = 0.1
+cont2 = 0.1
 
 def inception_parameters_init(patch_size_list, depth_size_list, input_depth, std):
 	weighted_list = list()
@@ -202,51 +193,39 @@ def output_parameters_init(node_size_list, input_size, std):
 
 	return weighted_list, bias_list
 
-def inception_compute(data_input, weighted_list, bias_list, conv_padding, pool_padding, pool_size, pool_list, dropout_keep_prob):
+def inception_compute(data_input, weighted_list, bias_list, conv_padding, pool_padding, pool_size):
 	
 	for i in range(len(weighted_list)):
 		if(i == 0):
 			conv = tf.nn.conv2d(data_input, weighted_list[i], [1, conv_padding, conv_padding, 1], padding='SAME')
-			if(pool_list[i] == 1):
-				pool = tf.nn.max_pool(selu(conv + bias_list[i]) , [1, pool_size, pool_size, 1], [1, pool_padding, pool_padding, 1], padding='SAME')
-				hidden = tf.nn.dropout(pool, keep_prob = dropout_keep_prob)
-			else:
-				hidden = tf.nn.dropout(selu(conv + bias_list[i]), keep_prob = dropout_keep_prob)
+			pool = tf.nn.max_pool(conv + bias_list[i] , [1, pool_size, pool_size, 1], [1, pool_padding, pool_padding, 1], padding='SAME')
+			hidden = tf.nn.tanh(pool)
 		else:
 			conv = tf.nn.conv2d(data_input, weighted_list[i], [1, conv_padding, conv_padding, 1], padding='SAME')
-			if(pool_list[i] == 1):
-				pool = tf.nn.max_pool(selu(conv + bias_list[i]) , [1, pool_size, pool_size, 1], [1, pool_padding, pool_padding, 1], padding='SAME')
-				hidden = tf.concat([hidden, tf.nn.dropout(pool, keep_prob = dropout_keep_prob)], 3)
-			else:
-				hidden = tf.concat([hidden, tf.nn.dropout(selu(conv + bias_list[i]), keep_prob = dropout_keep_prob)], 3)
+			pool = tf.nn.max_pool(conv + bias_list[i] , [1, pool_size, pool_size, 1], [1, pool_padding, pool_padding, 1], padding='SAME')
+			hidden = tf.concat(3, [hidden, tf.nn.tanh(pool)])
 	return hidden
 
-def conv_compute(data_input, weighted_list, bias_list, conv_padding, pool_padding, pool_size, pool_list, dropout_keep_prob):
+def conv_compute(data_input, weighted_list, bias_list, conv_padding, pool_padding, pool_size):
 	
 	for i in range(len(weighted_list)):
 		if(i == 0):
 			conv = tf.nn.conv2d(data_input, weighted_list[i], [1, conv_padding, conv_padding, 1], padding='SAME')
-			if(pool_list[i] == 1):
-				pool = tf.nn.max_pool(selu(conv + bias_list[i]) , [1, pool_size, pool_size, 1], [1, pool_padding, pool_padding, 1], padding='SAME')
-				hidden = tf.nn.dropout(pool, keep_prob = dropout_keep_prob)
-			else:
-				hidden = tf.nn.dropout(selu(conv + bias_list[i]), keep_prob = dropout_keep_prob)
+			pool = tf.nn.max_pool(conv + bias_list[i] , [1, pool_size, pool_size, 1], [1, pool_padding, pool_padding, 1], padding='SAME')
+			hidden = tf.nn.tanh(pool)
 		else:
 			conv = tf.nn.conv2d(hidden, weighted_list[i], [1, conv_padding, conv_padding, 1], padding='SAME')
-			if(pool_list[i] == 1):
-				pool = tf.nn.max_pool(selu(conv + bias_list[i]) , [1, pool_size, pool_size, 1], [1, pool_padding, pool_padding, 1], padding='SAME')
-				hidden = tf.nn.dropout(pool, keep_prob = dropout_keep_prob)
-			else:
-				hidden = tf.nn.dropout(selu(conv + bias_list[i]), keep_prob = dropout_keep_prob)
+			pool = tf.nn.max_pool(conv + bias_list[i] , [1, pool_size, pool_size, 1], [1, pool_padding, pool_padding, 1], padding='SAME')
+			hidden = tf.nn.tanh(pool)
 	return hidden
 
 def fc_compute(data_input, weighted_list, bias_list, dropout_keep_prob):
 
 	for i in range(len(weighted_list)):
 		if(i == 0):
-			hidden = tf.nn.dropout(selu(tf.matmul(data_input, weighted_list[i]) + bias_list[i]), keep_prob=dropout_keep_prob)
+			hidden = tf.nn.dropout(tf.nn.tanh(tf.matmul(data_input, weighted_list[i]) + bias_list[i]), keep_prob=dropout_keep_prob)
 		else:
-			hidden = tf.nn.dropout(selu(tf.matmul(hidden, weighted_list[i]) + bias_list[i]), keep_prob=dropout_keep_prob)
+			hidden = tf.nn.dropout(tf.nn.tanh(tf.matmul(hidden, weighted_list[i]) + bias_list[i]), keep_prob=dropout_keep_prob)
 
 	return hidden
 def output_compute(data_input, weighted_list, bias_list):
@@ -260,8 +239,7 @@ def output_compute(data_input, weighted_list, bias_list):
 def compute_loss_and_minimize(tf_train_labels, tf_train_labels_length, logits_list):
 
 	loss_list = list()
-	loss = tf.multiply(
-		tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=tf_train_labels_length, logits=logits_list[0])), 1.67)
+	loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(labels=tf_train_labels_length, logits=logits_list[0]))
 	loss_list.append(loss)
 	#opt = optimizer.minimize(loss=loss, var_list=list(itertools.chain(default_vars, [output_weight[0], output_bias[0]])))
 
@@ -275,12 +253,8 @@ def compute_loss_and_minimize(tf_train_labels, tf_train_labels_length, logits_li
 			else:
 				loss_list[j + 1] = loss_list[j + 1] + partial_loss
 			#opt = optimizer.minimize(loss=partial_loss, var_list=list(itertools.chain(default_vars, [output_weight[j + 1], output_bias[j + 1]])))
-
-	for i in xrange(1, len(loss_list)):
-		loss_list[i] = tf.divide(loss_list[i], float(batch_size))
-		loss = tf.add(loss, loss_list[i])
-
-	return loss, loss_list
+			loss = loss + partial_loss
+	return tf.reduce_mean(loss), loss_list
 
 def softmax_list(logits_list):
 	predictions_list = list()
@@ -297,72 +271,68 @@ def compute_accuracy(predictions_list, labels):
 		max_num = 0
 		pre_num = 0
 		pre_prob = 0.0
-		if(i == 0):
+		if(i == 8 or i == 9):
 			print 'label: {}'.format(labels[i])
-		for j in xrange(np.argmax(predictions_list[0][i]) + 1):
-			max_num = max_num * 10 + np.argmax(predictions_list[j + 1][i])
-		# for j in range(predictions_list[0][i].shape[0]):
-		# 	if(j == 0):
-		# 		max_pos = np.argmax(predictions_list[j + 1][i])
-		# 		temp_num = max_pos
-		# 		if (predictions_list[0][i, j] == 0):
-		# 			temp_prob = predictions_list[j + 1][i, max_pos]
-		# 			pre_prob = temp_prob
-		# 		else:
-		# 			temp_prob = predictions_list[0][i, j] * predictions_list[j + 1][i, max_pos]
-		# 			if(temp_prob > max_prob):
-		# 				max_prob = temp_prob
-		# 				max_num = temp_num
-		# 			pre_prob = temp_prob / predictions_list[0][i, j]
-		# 		pre_num = temp_num
+		for j in range(predictions_list[0][i].shape[0]):
+			if(j == 0):
+				max_pos = np.argmax(predictions_list[j + 1][i])
+				temp_num = max_pos
+				if (predictions_list[0][i, j] == 0):
+					temp_prob = predictions_list[j + 1][i, max_pos]
+					pre_prob = temp_prob
+				else:
+					temp_prob = predictions_list[0][i, j] * predictions_list[j + 1][i, max_pos]
+					if(temp_prob > max_prob):
+						max_prob = temp_prob
+						max_num = temp_num
+					pre_prob = temp_prob / predictions_list[0][i, j]
+				pre_num = temp_num
 				
-		# 		# if(i == 0):
-		# 		# 	print '{}'.format(i)
-		# 		# 	print ('digit num')
-		# 		# 	print (predictions_list[0][i, :])
-		# 		# 	print ('first digit')
-		# 		# 	print (predictions_list[1][i, :])
-		# 		# 	print ('second digit')
-		# 		# 	print (predictions_list[2][i, :])
-		# 		# 	print ('third digit')
-		# 		# 	print (predictions_list[3][i, :])
-		# 		# 	print ('forth digit')
-		# 		# 	print (predictions_list[4][i, :])
-		# 		# 	print ('fifth digit')
-		# 		# 	print (predictions_list[5][i, :])
-		# 		# 	print ('sixth digit')
-		# 		# 	print (predictions_list[6][i, :])
-		# 		# 	print 'max pos : {}'.format(max_pos)
-		# 		# 	print 'temp_prob : {}'.format(temp_prob)
-		# 		# 	print 'pre_num : {}'.format(pre_num)
+				if(i == 8 or i == 9):
+					print '{}'.format(i)
+					print ('digit num')
+					print (predictions_list[0][i, :])
+					print ('first digit')
+					print (predictions_list[1][i, :])
+					print ('second digit')
+					print (predictions_list[2][i, :])
+					print ('third digit')
+					print (predictions_list[3][i, :])
+					print ('forth digit')
+					print (predictions_list[4][i, :])
+					print ('fifth digit')
+					print (predictions_list[5][i, :])
+					print ('sixth digit')
+					print (predictions_list[6][i, :])
+					print 'max pos : {}'.format(max_pos)
+					print 'temp_prob : {}'.format(temp_prob)
+					print 'pre_num : {}'.format(pre_num)
 	
-		# 	else:
-		# 		max_pos = np.argmax(predictions_list[j + 1][i])
-		# 		temp_num = pre_num * 10 + max_pos
-		# 		if (predictions_list[0][i, j] == 0):
-		# 			temp_prob = pre_prob * predictions_list[j + 1][i][max_pos]
-		# 			pre_prob = temp_prob
-		# 		else:
-		# 			temp_prob = (pre_prob * predictions_list[0][i][j]) * predictions_list[j + 1][i][max_pos]
-		# 			if(temp_prob > max_prob):
-		# 				max_prob = temp_prob
-		# 				max_num = temp_num
+			else:
+				max_pos = np.argmax(predictions_list[j + 1][i])
+				temp_num = pre_num * 10 + max_pos
+				if (predictions_list[0][i, j] == 0):
+					temp_prob = pre_prob * predictions_list[j + 1][i][max_pos]
+					pre_prob = temp_prob
+				else:
+					temp_prob = (pre_prob * predictions_list[0][i][j]) * predictions_list[j + 1][i][max_pos]
+					if(temp_prob > max_prob):
+						max_prob = temp_prob
+						max_num = temp_num
 
-		# 			pre_prob = temp_prob / predictions_list[0][i][j]
+					pre_prob = temp_prob / predictions_list[0][i][j]
 
-		# 		pre_num = temp_num
+				pre_num = temp_num
 				
-		# 		# if(i == 0):
-		# 		# 	print 'max pos : {}'.format(max_pos)
-		# 		# 	print 'temp_prob : {}'.format(temp_prob)
-		# 		# 	print 'pre_num : {}'.format(pre_num)
-		
+				if(i == 8 or i == 9):
+					print 'max pos : {}'.format(max_pos)
+					print 'temp_prob : {}'.format(temp_prob)
+					print 'pre_num : {}'.format(pre_num)
+	
 		if(lll < 7):
 			lll = lll + 1
 			print 'pred:{} , real: {}'.format(max_num, labels[i])
-			# print 'pred:{} , real: {}'.format(np.argmax(predictions_list[1][i]), int(str(labels[i])[0]))
 		if(max_num == labels[i]):
-		# if((np.argmax(predictions_list[1][i])) == int(str(labels[i])[0])):
 			correct = correct + 1.0
 
 	return 100.0 * correct / labels.shape[0]
@@ -381,36 +351,55 @@ with graph.as_default():
 	
 
 	keep_prob = tf.placeholder(tf.float32)
-
-	learning_rate_array = tf.placeholder(tf.float32, shape=(digit_length + 1))
 	# Variables.
-
+	# inception_weight_1, inception_bias_1 = inception_parameters_init(
+	# 	[patch_size_1 ,patch_size_2, patch_size_3], [depth_1, depth_2, depth_3], num_channels, std1)
 	inception_weight_1, inception_bias_1 = inception_parameters_init(
 		[patch_size_1], [depth_1], num_channels, std1)
 
 
-	conv_weight_2, conv_bias_2 = conv_parameters_init([patch_size_1, patch_size_1], [depth_3, depth_4], depth_1, std1)
 
-	input_size = int(math.ceil(float(image_size) / 8.0 )) * int(math.ceil(float(image_size) / 8.0)) * (depth_4)
+	# layer2_1_weights = tf.Variable(tf.truncated_normal([patch_size_1, patch_size_1, depth + depth_2 + depth_3, depth + 2], stddev=0.01))
+	# layer2_1_biases = tf.Variable(tf.constant(1.0, shape=[depth + 2]))
+	# layer2_2_weights = tf.Variable(tf.truncated_normal([patch_size_2, patch_size_2, depth + depth_2 + depth_3, depth_2 + 2], stddev=0.01))
+	# layer2_2_biases = tf.Variable(tf.constant(1.0, shape=[depth_2 + 2]))
+	# layer2_3_weights = tf.Variable(tf.truncated_normal([patch_size_3, patch_size_3, depth + depth_2 + depth_3, depth_3 + 2], stddev=0.01))
+	# layer2_3_biases = tf.Variable(tf.constant(1.0, shape=[depth_3 + 2]))
 
-	# fc_weight_3, fc_bias_3 = fc_parameters_init([num_hidden_1, num_hidden_2], input_size, std2)
+	# conv_weight_2, conv_bias_2 = conv_parameters_init([patch_size_2], [depth_4], depth_1 + depth_2 + depth_3, std1)
+	conv_weight_2, conv_bias_2 = conv_parameters_init([patch_size_2], [depth_4], depth_1, std1)
+
+	input_size = int(math.ceil(float(image_size) / 4.0 )) * int(math.ceil(float(image_size) / 4.0)) * (depth_4)
+
+	fc_weight_3, fc_bias_3 = fc_parameters_init([num_hidden_1, num_hidden_2], input_size, std2)
 
 	output_weight_4, output_bias_4 = output_parameters_init(
-		[digit_length, num_labels, num_labels, num_labels, num_labels, num_labels, num_labels], input_size, std2)
+		[digit_length, num_labels, num_labels, num_labels, num_labels, num_labels, num_labels], num_hidden_2, std2)
   
 	# Model.
 	def model(data):
 		# layer 1
-		inception_out_1 = inception_compute(data, inception_weight_1, inception_bias_1, 1, 2, 2, [1], keep_prob)
+		inception_out_1 = inception_compute(data, inception_weight_1, inception_bias_1, 1, 2, 2)
 
-		conv_out_2 = conv_compute(inception_out_1, conv_weight_2, conv_bias_2, 1, 2, 2, [1, 1], keep_prob)
+		# layer 2
+		# conv = tf.nn.conv2d(hidden, layer2_1_weights, [1, 1, 1, 1], padding='SAME')
+		# pool = tf.nn.max_pool(conv + layer2_1_biases, [1, 2, 2, 1], [1, 2, 2, 1], padding='SAME')
+		# hidden_2 = tf.nn.tanh(pool)
+		# conv = tf.nn.conv2d(hidden, layer2_2_weights, [1, 1, 1, 1], padding='SAME')
+		# pool = tf.nn.max_pool(conv + layer2_2_biases, [1, 2, 2, 1], [1, 2, 2, 1], padding='SAME')
+		# hidden_2 = tf.concat(3, [hidden_2, tf.nn.tanh(pool)])
+		# conv = tf.nn.conv2d(hidden, layer2_3_weights, [1, 1, 1, 1], padding='SAME')
+		# pool = tf.nn.max_pool(conv + layer2_3_biases, [1, 2, 2, 1], [1, 2, 2, 1], padding='SAME')
+		# hidden_2 = tf.concat(3, [hidden_2, tf.nn.tanh(pool)])
+
+		conv_out_2 = conv_compute(inception_out_1, conv_weight_2, conv_bias_2, 1, 2, 2)
 
 		shape = conv_out_2.get_shape().as_list()
-		# print '{}, {}, {}, {}'.format(shape[0], shape[1], shape[2], shape[3])
+		print '{}, {}, {}, {}'.format(shape[0], shape[1], shape[2], shape[3])
 		reshape = tf.reshape(conv_out_2, [shape[0], shape[1] * shape[2] * shape[3]])
 
-		# fc_out_3 = fc_compute(reshape, fc_weight_3, fc_bias_3, keep_prob)
-		return output_compute(reshape, output_weight_4, output_bias_4), reshape
+		fc_out_3 = fc_compute(reshape, fc_weight_3, fc_bias_3, keep_prob)
+		return output_compute(fc_out_3, output_weight_4, output_bias_4), reshape
 
 	# Training computation.
 	logits_list, reshape = model(tf_train_dataset)
@@ -419,21 +408,18 @@ with graph.as_default():
 
 	# learning rate
 	#learning_rate = tf.train.exponential_decay(0.1, global_step, 2000, 0.8)
-	# learning_rate = 0.001
-	# learning_rate_list = [0.0001, 0.0001, 0.0001, 0.0001, 0.0001]
+	learning_rate = 0.01
 	# Optimizer.
-	# default_vars = list(itertools.chain(inception_weight_1, inception_bias_1, conv_weight_2, conv_bias_2, fc_weight_3, fc_bias_3))
-	default_vars = list(itertools.chain(inception_weight_1, inception_bias_1, conv_weight_2, conv_bias_2))
-	# default_vars = list()
+	default_vars = list(itertools.chain(inception_weight_1, inception_bias_1, conv_weight_2, conv_bias_2, fc_weight_3, fc_bias_3))
 	opt = list()
-	for i in xrange(digit_length + 1):
-		opt.append(tf.train.AdamOptimizer(learning_rate_array[i]))
+	for i in range(digit_length + 1):
+		opt.append(tf.train.AdagradOptimizer(learning_rate))
 
 	loss, loss_list= compute_loss_and_minimize(
 		tf_train_labels, tf_train_labels_length, logits_list)
 	# optimizer = tf.train.AdagradOptimizer(learning_rate).minimize(loss)
 	optimizer = list()
-	for i in xrange(digit_length + 1):
+	for i in range(digit_length + 1):
 		optimizer.append(opt[i].minimize(loss=loss_list[i], var_list=list(itertools.chain(
 			default_vars, [output_weight_4[i], output_bias_4[i]]))))
 	
@@ -447,10 +433,7 @@ with graph.as_default():
 
 # In[14]:
 
-num_steps = 50001
-train_y = list()
-valid_y = list()
-X = list()
+num_steps = 30001
 
 with tf.Session(graph=graph) as session:
 	tf.global_variables_initializer().run()
@@ -463,53 +446,22 @@ with tf.Session(graph=graph) as session:
 		batch_real_labels = train_labels[offset:(offset + batch_size)]
 		batch_labels_length = train_labels_length[offset:(offset + batch_size), :]
 		# batch_length_num = train_labels_num[offset:(offset + batch_size)]
-		l_feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels, tf_train_real_labels : batch_real_labels, 
-			tf_train_labels_length : batch_labels_length, keep_prob: 0.7}
-		
-		l_l = session.run(loss_list, feed_dict=l_feed_dict)
-
-		decay_rate = 0.9
-		global_step = step
-		decay_steps = 2000.0
-		# l_ll = 0.0001 * np.asarray(l_l)
-		ll_sum = np.sum(np.asarray(l_l) ** 2)
-		# LR =  0.02 * math.pow(decay_rate, float(step) / decay_steps)
-		LR = 0.001
-		l_ll = LR * ((np.asarray(l_l) ** 2 ) / ll_sum)
-
 		feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels, tf_train_real_labels : batch_real_labels, 
-			tf_train_labels_length : batch_labels_length, keep_prob: 0.7, learning_rate_array:l_ll}
-		_= session.run([optimizer], feed_dict=feed_dict)
+			tf_train_labels_length : batch_labels_length, keep_prob: 0.7}
+		_, l, ll, lll= session.run([optimizer, loss, loss_list, reshape], feed_dict=feed_dict)
 		if (step % 500 == 0):
 			print('Iter: %d' % step)
-			# print('Minibatch loss : %f' % l)
-			print ('loss: {}'.format(l_l))
-			# print ('learning rate: {}'.format(l_ll))
+			print('Minibatch loss : %f' % l)
 			vfeed_dict = {tf_train_dataset : batch_data, tf_train_real_labels : batch_real_labels, keep_prob: 1.0}
-			print ('{} and {}'.format(batch_real_labels[0], batch_real_labels[1]))
-			print ('{} and {}'.format(batch_real_labels[5], batch_real_labels[3]))
-			aa = session.run(reshape, feed_dict={tf_train_dataset: batch_data, keep_prob:1.0})
+			print 'session: {}'.format(lll)
+			# print ('tf_length : {}'.format(session.run(train_labels_length[:5], feed_dict = {tf_train_labels_length : batch_labels_length})))
+			print('Minibatch accuracy: %.1f%%' % compute_accuracy(session.run(
+				train_predictions_list, feed_dict=vfeed_dict), batch_real_labels))
+			print('Validation accuracy: %.1f%%' % compute_accuracy(session.run(valid_predictions_list,
+				feed_dict = {keep_prob: 1.0}), valid_labels[:5000]))
 
-			print ('{}, {}'.format(np.sum((aa[0] - aa[1])**2), np.sum((aa[5] - aa[3])**2)))
-			x = session.run(logits_list, feed_dict=vfeed_dict)
-			for i in range(digit_length + 1):
-				print i
-				print (x[i][:4])
+			# for i in range(0, 7):
+			# 	print('digit_para{}: {}'.format(i, session.run(output_weight_4[i][0])))
 
-			train_acc = compute_accuracy(session.run(train_predictions_list, feed_dict=vfeed_dict), batch_real_labels)
-			print('Minibatch accuracy: %.1f%%' % train_acc)
-			valid_acc = compute_accuracy(session.run(valid_predictions_list,feed_dict = {keep_prob: 1.0}), valid_labels[:5000])
-			train_y.append(train_acc)
-			valid_y.append(valid_acc)
-			X.append(step)
-			Y1,  = plt.plot(X, train_y, 'r--')
-			Y2,  = plt.plot(X, valid_y, 'b^')
-			plt.legend([Y1, Y2], ['train_acc', 'valid_acc'])
-			plt.axis([0, step + 1, 0, 100])
-			plt.ylabel('accuracy(%)')
-			plt.xlabel('loop')
-			print('Validation accuracy: %.1f%%' % valid_acc)
-
-plt.show()
 	#print('Test accuracy: %.1f%%' % accuracy(test_prediction.eval(feed_dict = {keep_prob: 1.0}), test_labels_conv))
 
